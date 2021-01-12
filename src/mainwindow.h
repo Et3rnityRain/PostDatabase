@@ -40,6 +40,8 @@ private slots:
     void slot_contextMenu(QPoint pos);
     void slot_edit();
     void slot_add();
+    void slot_getUsersPosts();
+    void slot_getCountOfPackagesInPO();
     void slot_closeWindow();
     void slot_changeTable(const QString &text);
 

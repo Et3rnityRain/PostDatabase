@@ -14,61 +14,71 @@ PostDatabase::PostDatabase()
 
 void PostDatabase::addRecord(const QVariantList &data, QString tableName)
 {
-    QSqlQuery query;
-    QString command = "INSERT INTO " + tableName + " (";
-    QStringList columnNames = getColumnName(tableName);
+    if(db.open())
+    {
+        QSqlQuery query;
+        QString command = "INSERT INTO " + tableName + " (";
+        QStringList columnNames = getColumnName(tableName);
 
-    for(int i = 1; i < columnNames.size(); i++) {
-        command += columnNames[i];
-        if (i + 1 != columnNames.size())
-            command += ", ";
-        else
-            command += ") VALUES (";
-    }
+        for(int i = 1; i < columnNames.size(); i++) {
+            command += columnNames[i];
+            if (i + 1 != columnNames.size())
+                command += ", ";
+            else
+                command += ") VALUES (";
+        }
 
-    for(int i = 1; i < columnNames.size(); i++) {
-        command += "?";
-        if (i + 1 != columnNames.size())
-            command += ", ";
-        else
-            command += ");";
-    }
+        for(int i = 1; i < columnNames.size(); i++) {
+            command += "?";
+            if (i + 1 != columnNames.size())
+                command += ", ";
+            else
+                command += ");";
+        }
 
-    query.prepare(command);
+        query.prepare(command);
 
-    for(int i = 0; i < columnNames.size() - 1; i++) {
-        query.addBindValue(data[i]);
-    }
+        for(int i = 0; i < columnNames.size() - 1; i++) {
+            query.addBindValue(data[i]);
+        }
 
-    if(!query.exec()) {
-        QMessageBox::critical(NULL, QObject::tr("Ошибка при выполнении команды UPDATE!"), query.lastError().text());
+        if(!query.exec()) {
+            QMessageBox::critical(NULL, QObject::tr("Ошибка при выполнении команды UPDATE!"), query.lastError().text());
+        }
+
+        query.clear();
     }
 }
 
 void PostDatabase::editRecord(const int id, const QVariantList &data, const QString tableName)
 {
-    QSqlQuery query;
-    QString command = "UPDATE " + tableName + " SET ";
-    QStringList columnNames = getColumnName(tableName);
+    if(db.open())
+    {
+        QSqlQuery query;
+        QString command = "UPDATE " + tableName + " SET ";
+        QStringList columnNames = getColumnName(tableName);
 
-    for(int i = 1; i < columnNames.size(); i++) {
-        command += columnNames[i] + " = ?";
-        if (i + 1 != columnNames.size())
-            command += ", ";
-    }
+        for(int i = 1; i < columnNames.size(); i++) {
+            command += columnNames[i] + " = ?";
+            if (i + 1 != columnNames.size())
+                command += ", ";
+        }
 
-    command += " WHERE " + columnNames[0] + " = ?;";
+        command += " WHERE " + columnNames[0] + " = ?;";
 
-    query.prepare(command);
+        query.prepare(command);
 
-    for(int i = 1; i < columnNames.size(); i++) {
-        query.addBindValue(data[i - 1]);
-    }
+        for(int i = 1; i < columnNames.size(); i++) {
+            query.addBindValue(data[i - 1]);
+        }
 
-    query.addBindValue(id);
+        query.addBindValue(id);
 
-    if(!query.exec()) {
-        QMessageBox::critical(NULL, QObject::tr("Ошибка при выполнении команды UPDATE!"), query.lastError().text());
+        if(!query.exec()) {
+            QMessageBox::critical(NULL, QObject::tr("Ошибка при выполнении команды UPDATE!"), query.lastError().text());
+        }
+
+        query.clear();
     }
 }
 

@@ -24,6 +24,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->addButton, SIGNAL(clicked()), this, SLOT(slot_addRecord()));
     connect(ui->comboBox, SIGNAL(currentIndexChanged(const QString)), this, SLOT(slot_changeTable(const QString)));
 
+
     ui->comboBox->setCurrentIndex(0);
 }
 
@@ -43,6 +44,7 @@ void MainWindow::showTable(const QString &tableName, const QStringList &headers)
     ui->postTableView->setModel(model);
     ui->postTableView->setColumnHidden(0, true);
     view->show();
+    postdatabase.db.close();
 }
 
 MainWindow::~MainWindow()
@@ -93,9 +95,23 @@ void MainWindow::slot_contextMenu(QPoint pos)
 
     QAction *editRecord = new QAction("Редактировать", this);
     QAction *deleteRecord = new QAction("Удалить", this);
+    QAction *getUsersPosts = new QAction("Показать статистику пользователя", this);
+    QAction *getCountOfPackagesInPO = new QAction("Показать число посылок каждого типа");
 
     connect(editRecord, SIGNAL(triggered()), this, SLOT(slot_editRecord()));
     connect(deleteRecord, SIGNAL(triggered()), this, SLOT(slot_removeRecord()));
+    connect(getUsersPosts, SIGNAL(triggered()), this, SLOT(slot_getUsersPosts()));
+    connect(getCountOfPackagesInPO, SIGNAL(triggered()), this, SLOT(slot_getCountOfPackagesInPO()));
+
+    if(current_table == "Users") {
+        menu->addAction(getUsersPosts);
+        menu->addSeparator();
+    }
+
+    if(current_table == "PostOffices") {
+        menu->addAction(getCountOfPackagesInPO);
+        menu->addSeparator();
+    }
 
     menu->addAction(editRecord);
     menu->addAction(deleteRecord);
@@ -135,8 +151,8 @@ void MainWindow::slot_editRecord()
     changeButton->setText("Изменить");
     cancelButton->setText("Отменить");
 
-    layout->addWidget(changeButton, 2, 0);
     layout->addWidget(cancelButton, 2, data.size() - 2);
+    layout->addWidget(changeButton, 2, 0);
 
     connect(changeButton, SIGNAL(clicked()), this, SLOT(slot_edit()));
     connect(cancelButton, SIGNAL(clicked()), this, SLOT(slot_closeWindow()));
@@ -154,6 +170,7 @@ void MainWindow::slot_edit()
         data.append(line->text());
     }
     postdatabase.editRecord(current_row, data, current_table);
+    data.clear();
     update();
     window->close();
 }
@@ -165,8 +182,50 @@ void MainWindow::slot_add()
         data.append(line->text());
     }
     postdatabase.addRecord(data, current_table);
+    data.clear();
     update();
     window->close();
+}
+
+void MainWindow::slot_getUsersPosts()
+{
+    int row = ui->postTableView->currentIndex().row();
+
+    if (postdatabase.db.open()) {
+        QString command = "call getUsersPosts(\'" + model->record(row).value(postdatabase.getColumnName(current_table).value(1)).toString() + "\');";
+
+        QSqlQueryModel *selectTable = new QSqlQueryModel;
+        selectTable->setQuery(command, postdatabase.db);
+
+        ui->postTableView->setModel(selectTable);
+        ui->postTableView->setColumnHidden(0, true);
+        ui->postTableView->show();
+
+        data.clear();
+        update();
+    }
+}
+
+void MainWindow::slot_getCountOfPackagesInPO()
+{
+    QString id = model->record(ui->postTableView->currentIndex().row()).value(postdatabase.getColumnName(current_table).value(0)).toString();
+
+    if (postdatabase.db.open()) {
+        QString command = "SELECT COUNT(size) AS little, (SELECT COUNT(size) FROM packages WHERE officeID =" + id
+                + " AND size = 'средняя') AS middle, (SELECT COUNT(size) FROM packages WHERE officeID =" + id
+                + " AND size = 'большая') AS big FROM packages WHERE officeID =  " + id
+                + " AND size = 'малая';";
+
+        QSqlQueryModel *selectTable = new QSqlQueryModel;
+        selectTable->setQuery(command, postdatabase.db);
+
+        ui->postTableView->setModel(selectTable);
+        ui->postTableView->setColumnHidden(0, false);
+        ui->postTableView->show();
+
+        data.clear();
+        update();
+    }
 }
 
 void MainWindow::slot_closeWindow()
@@ -190,9 +249,9 @@ void MainWindow::slot_removeRecord()
              * */
             if(!model->removeRow(row)) {
                 QMessageBox::warning(this,trUtf8("Уведомление"),
-                                     trUtf8("Не удалось удалить запись\n"
-                                            "Возможно она используется другими таблицами\n"
-                                            "Проверьте все зависимости и повторите попытку"));
+                                     trUtf8("Не удалось удалить запись.\n"
+                                            "Возможно она используется другими таблицами.\n"
+                                            "Проверьте все зависимости и повторите попытку."));
             }
             update();
         }
@@ -203,11 +262,13 @@ void MainWindow::update()
 {
     model->select();
     ui->postTableView->resizeColumnsToContents();
+    postdatabase.db.close();
 }
 
 void MainWindow::slot_changeTable(const QString &text)
 {
     current_table = text;
+    postdatabase.db.open();
     showTable(current_table, postdatabase.getColumnName(current_table));
     ui->postTableView->resizeColumnsToContents();
 
